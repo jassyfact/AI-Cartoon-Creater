@@ -23,8 +23,10 @@ app.post('/api/cartoon', async (req, res) => {
     return res.status(400).json({ error: 'Missing API key. Set NANOBANANA_API_KEY on the server.' });
   }
 
+  const endpoint = process.env.NANOBANANA_API_URL || 'https://nanobananaapi.ai/api/cartoon';
+
   try {
-    const upstream = await fetch('https://nanobananaapi.ai/v1/cartoon', {
+    const upstream = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

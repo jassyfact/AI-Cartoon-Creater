@@ -28,9 +28,13 @@ with st.form("cartoon-form"):
     submitted = st.form_submit_button("Generate")
 
 def call_nano_banana(prompt: str, size: str, style: str, key: str) -> str:
-    """Returns an image URL or a data URI string."""
+    """Returns an image URL or a data URI string.
+    Endpoint is configurable via NANOBANANA_API_URL; defaults to /api/cartoon.
+    """
+    endpoint = os.getenv("NANOBANANA_API_URL", "https://nanobananaapi.ai/api/cartoon")
+
     resp = requests.post(
-        "https://nanobananaapi.ai/v1/cartoon",
+        endpoint,
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
         json={"prompt": prompt, "size": size, "style": style},
         timeout=120,
