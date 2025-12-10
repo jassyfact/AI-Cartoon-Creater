@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Cartoon Creator</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0f172a;
+      --panel: #111827;
+      --text: #e2e8f0;
+      --accent: #22d3ee;
+      --muted: #94a3b8;
+      --error: #f97316;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(circle at 20% 20%, #1e293b, var(--bg) 45%),
+                  radial-gradient(circle at 80% 10%, #0ea5e9, var(--bg) 40%),
+                  var(--bg);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      padding: 24px;
+    }
+    .card {
+      width: min(960px, 100%);
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid #1f2937;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(6px);
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+      letter-spacing: 0.3px;
+    }
+    p {
+      margin: 4px 0 16px;
+      color: var(--muted);
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin: 12px 0 6px;
+    }
+    textarea, input, button {
+      width: 100%;
+      font: inherit;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+      background: #0b1220;
+      color: var(--text);
+      padding: 12px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    textarea:focus, input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.25);
+    }
+    textarea {
+      resize: vertical;
+      min-height: 90px;
+    }
+    .row {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr 1fr;
+    }
+    button {
+      cursor: pointer;
+      font-weight: 700;
+      background: linear-gradient(120deg, #22d3ee, #0ea5e9);
+      border: none;
+      margin-top: 14px;
+      color: #0b1220;
+      box-shadow: 0 16px 38px rgba(14, 165, 233, 0.35);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .output {
+      margin-top: 18px;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      min-height: 280px;
+      display: grid;
+      place-items: center;
+      background: #0b1220;
+      position: relative;
+      overflow: hidden;
+    }
+    .output img {
+      max-width: 100%;
+      max-height: 560px;
+      border-radius: 10px;
+      object-fit: contain;
+      display: block;
+    }
+    .status {
+      margin-top: 12px;
+      color: var(--muted);
+      min-height: 20px;
+    }
+    .status.error {
+      color: var(--error);
+    }
+    @media (max-width: 720px) {
+      .row { grid-template-columns: 1fr; }
+      body { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>AI Cartoon Creator</h1>
+    <p>Describe your scene; the proxy uses your server-side Nano Banana API key (no key field on the page).</p>
+
+    <form id="prompt-form">
+      <label for="prompt">Prompt</label>
+      <textarea id="prompt" placeholder="e.g., A detective corgi in a neon-lit city, comic style" required></textarea>
+
+      <div class="row">
+        <div>
+          <label for="size">Size</label>
+          <select id="size">
+            <option value="1024x1024">1024 x 1024</option>
+            <option value="768x768">768 x 768</option>
+            <option value="512x512">512 x 512</option>
+          </select>
+        </div>
+        <div>
+          <label for="style">Style hint</label>
+          <input id="style" type="text" placeholder="comic, toon-shaded, flat colors..." />
+        </div>
+      </div>
+
+      <button id="generate-btn" type="submit">Generate Cartoon</button>
+    </form>
+
+    <div class="status" id="status"></div>
+
+    <div class="output" id="output">
+      <span id="placeholder">Your image will appear here.</span>
+      <img id="result" alt="Generated cartoon" style="display:none;" />
+    </div>
+  </main>
+
+  <script>
+    const form = document.getElementById('prompt-form');
+    const promptInput = document.getElementById('prompt');
+    const sizeInput = document.getElementById('size');
+    const styleInput = document.getElementById('style');
+    const statusEl = document.getElementById('status');
+    const outputEl = document.getElementById('output');
+    const imgEl = document.getElementById('result');
+    const placeholderEl = document.getElementById('placeholder');
+    const button = document.getElementById('generate-btn');
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle('error', isError);
+    }
+
+    async function generateCartoon(prompt, size, style) {
+      const response = await fetch('/api/cartoon', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          prompt,
+          size,
+          style: style?.trim() || 'cartoon'
+        })
+      });
+
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || `Request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      const image = data.image;
+      if (!image) throw new Error('No image returned from proxy');
+      return image;
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const prompt = promptInput.value.trim();
+
+      button.disabled = true;
+      setStatus('Generating via proxy...');
+      imgEl.style.display = 'none';
+      placeholderEl.textContent = 'Rendering...';
+
+      try {
+        const imageSrc = await generateCartoon(prompt, sizeInput.value, styleInput.value);
+        imgEl.src = imageSrc;
+        imgEl.style.display = 'block';
+        placeholderEl.textContent = '';
+        setStatus('Done!');
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message || 'Something went wrong.', true);
+        placeholderEl.textContent = 'Generation failed. Adjust your prompt or try again.';
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
+
